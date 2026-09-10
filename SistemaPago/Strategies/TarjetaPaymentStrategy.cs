@@ -7,9 +7,10 @@ namespace SistemaPago.Strategies
 {
     public class TarjetaPaymentStrategy : IPaymentStrategy
     {
-        void IPaymentStrategy.Pagar(decimal monto)
+        public string Pagar(decimal monto)
         {
-            Console.WriteLine($"Pagando ${monto} con tarjeta...");
+            return $"Pago de ${monto} realizado con tarjeta.";
         }
+
     }
 }

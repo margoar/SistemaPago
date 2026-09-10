@@ -1,0 +1,11 @@
+C:\REPOMG\SistemaPago\SistemaPago\obj\Debug\netcoreapp2.0\SistemaPago.csproj.AssemblyReference.cache
+C:\REPOMG\SistemaPago\SistemaPago\obj\Debug\netcoreapp2.0\SistemaPago.csproj.CoreCompileInputs.cache
+C:\REPOMG\SistemaPago\SistemaPago\obj\Debug\netcoreapp2.0\SistemaPago.AssemblyInfoInputs.cache
+C:\REPOMG\SistemaPago\SistemaPago\obj\Debug\netcoreapp2.0\SistemaPago.AssemblyInfo.cs
+C:\REPOMG\SistemaPago\SistemaPago\bin\Debug\netcoreapp2.0\SistemaPago.deps.json
+C:\REPOMG\SistemaPago\SistemaPago\bin\Debug\netcoreapp2.0\SistemaPago.runtimeconfig.json
+C:\REPOMG\SistemaPago\SistemaPago\bin\Debug\netcoreapp2.0\SistemaPago.runtimeconfig.dev.json
+C:\REPOMG\SistemaPago\SistemaPago\bin\Debug\netcoreapp2.0\SistemaPago.dll
+C:\REPOMG\SistemaPago\SistemaPago\bin\Debug\netcoreapp2.0\SistemaPago.pdb
+C:\REPOMG\SistemaPago\SistemaPago\obj\Debug\netcoreapp2.0\SistemaPago.dll
+C:\REPOMG\SistemaPago\SistemaPago\obj\Debug\netcoreapp2.0\SistemaPago.pdb

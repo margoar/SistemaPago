@@ -7,7 +7,7 @@ namespace SistemaPago.Strategies
 {
     public interface IPaymentStrategy
     {
-        void Pagar(decimal monto);
+        string Pagar(decimal monto);
 
     }
 }

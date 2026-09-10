@@ -14,9 +14,9 @@ namespace SistemaPago.Strategies
             _paymentStrategy = paymentStrategy;
         }
 
-        public void ProcesarPago(decimal monto)
+        public string ProcesarPago(decimal monto)
         {
-            _paymentStrategy.Pagar(monto);
+            return _paymentStrategy.Pagar(monto);
         }
     }
 }
