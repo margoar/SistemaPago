@@ -23,7 +23,8 @@ namespace SistemaPago
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
-            services.AddScoped<IPaymentStrategy, TarjetaPaymentStrategy>();
+            //services.AddScoped<IPaymentStrategy, TarjetaPaymentStrategy>();
+            services.AddScoped<IPaymentStrategy, PayPalPaymentStrategy>();
             services.AddScoped<PaymentService>();
         }
 
