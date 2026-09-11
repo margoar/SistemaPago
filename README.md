@@ -1,172 +1,213 @@
-# SistemaPago — Patrón Strategy en ASP.NET Core
+# SistemaPago — Patrón Factory
 
 Aplicación web mínima (ASP.NET Core 2.0, Razor Pages) que sirve como ejemplo didáctico
-del **patrón de diseño Strategy** aplicado a un sistema de pagos.
+de patrones de diseño aplicados a un sistema de pagos.
 
-## ¿Qué problema resuelve?
+**Este repositorio trabaja un patrón por rama, y cada patrón vive en su propia carpeta:**
 
-Un sistema de pagos necesita cobrar de varias formas: tarjeta, PayPal, transferencia,
-criptomonedas... La solución ingenua es un `if/else` o un `switch` gigante:
+| Rama | Carpeta | Patrón | Documentación |
+|---|---|---|---|
+| `strategy` | `SistemaPago/Strategies/` | Strategy | README de esa rama |
+| `factory` ← *estás aquí* | `SistemaPago/Payments/` | Factory | este archivo |
+
+---
+
+## ¿Qué problema resuelve el Factory?
+
+El sistema debe cobrar de varias formas (tarjeta, PayPal, transferencia) y **el medio de pago
+lo elige el usuario en tiempo de ejecución**. Sin el patrón, cada parte del código que
+necesita un medio de pago tiene que saber construirlo:
 
 ```csharp
-// ❌ Sin Strategy: el método crece cada vez que aparece un medio de pago nuevo
-public string ProcesarPago(decimal monto, string tipo)
-{
-    if (tipo == "tarjeta")      return $"Pago de ${monto} con tarjeta.";
-    else if (tipo == "paypal")  return $"Pago de ${monto} con PayPal";
-    else if (tipo == "cripto")  return ...;   // hay que EDITAR esta clase otra vez
-}
+// ❌ Sin Factory: el PageModel conoce TODAS las clases concretas
+if (tipo == "tarjeta")            pago = new TarjetaPayment();
+else if (tipo == "paypal")        pago = new PayPalPayment();
+else if (tipo == "transferencia") pago = new TransferenciaPayment();
 ```
 
-Ese código viola el **principio abierto/cerrado**: para agregar un comportamiento hay que
-modificar una clase que ya funcionaba (y volver a probarla toda).
+Ese bloque termina copiado en cada página, servicio o controlador que necesite cobrar. Si
+mañana se agrega un medio de pago hay que buscar y editar **todas** las copias.
 
-**Strategy** propone lo contrario: encapsular cada algoritmo en su propia clase, hacer que
-todas cumplan un mismo contrato, y que el código cliente reciba la que necesite sin
-saber cuál es.
+**Factory** propone concentrar esa decisión en un solo lugar: una clase cuya única
+responsabilidad es *saber construir* el objeto correcto a partir de un dato de entrada. El
+resto del sistema pide el objeto y recibe la interfaz, sin conocer jamás las clases concretas.
+
+> **Strategy vs. Factory** — se complementan y por eso se confunden:
+> Strategy resuelve **cómo se ejecuta** un algoritmo intercambiable;
+> Factory resuelve **quién decide y construye** cuál instancia se usa.
+> Aquí `IPayment` define el comportamiento y `PaymentFactory` decide la implementación.
 
 ## Los actores del patrón en este proyecto
 
 | Rol en el patrón | Clase en el proyecto | Qué hace |
 |---|---|---|
-| **Strategy** (contrato) | [IPaymentStrategy.cs](SistemaPago/Strategies/IPaymentStrategy.cs) | Declara `string Pagar(decimal monto)` |
-| **Concrete Strategy** | [TarjetaPaymentStrategy.cs](SistemaPago/Strategies/TarjetaPaymentStrategy.cs) | Implementa el cobro con tarjeta |
-| **Concrete Strategy** | [PayPalPaymentStrategy.cs](SistemaPago/Strategies/PayPalPaymentStrategy.cs) | Implementa el cobro con PayPal |
-| **Context** | [PaymentService.cs](SistemaPago/Strategies/PaymentService.cs) | Usa una estrategia sin saber cuál es |
-| **Cliente / configuración** | [Startup.cs](SistemaPago/Startup.cs) | Decide qué estrategia se inyecta |
-| **Interfaz de usuario** | [Index.cshtml.cs](SistemaPago/Pages/Index.cshtml.cs) | Botón que dispara el pago y muestra el resultado |
+| **Product** (contrato) | [IPayment.cs](SistemaPago/Payments/IPayment.cs) | Declara `string Procesar(decimal monto)` |
+| **Concrete Product** | [TarjetaPayment.cs](SistemaPago/Payments/TarjetaPayment.cs) | Cobro con tarjeta |
+| **Concrete Product** | [PayPalPayment.cs](SistemaPago/Payments/PayPalPayment.cs) | Cobro con PayPal |
+| **Concrete Product** | [TransferenciaPayment.cs](SistemaPago/Payments/TransferenciaPayment.cs) | Cobro por transferencia |
+| **Factory** | [PaymentFactory.cs](SistemaPago/Payments/PaymentFactory.cs) | Recibe un `string` y devuelve el `IPayment` que corresponde |
+| **Cliente** | [Index.cshtml.cs](SistemaPago/Pages/Index.cshtml.cs) | Pide el pago a la fábrica y muestra el resultado |
 
 ## Cómo fluye una petición
 
 ```
-Index.cshtml  (botón "Pagar $100.000")
-      │  POST
+Index.cshtml  (el usuario elige el medio de pago y envía el formulario)
+      │  POST  tipoPago = "paypal"
       ▼
-IndexModel.OnPost()                 ← recibe PaymentService por constructor
-      │  _paymentService.ProcesarPago(100000)
+IndexModel.OnPost()
+      │  _factory.Create("paypal")   ← sólo conoce el string y la interfaz
       ▼
-PaymentService.ProcesarPago()       ← el CONTEXTO: sólo conoce IPaymentStrategy
-      │  _paymentStrategy.Pagar(monto)
+PaymentFactory.Create()             ← LA FÁBRICA: único lugar con los "new"
+      │  return new PayPalPayment();
       ▼
-PayPalPaymentStrategy.Pagar()       ← la estrategia concreta que Startup registró
-      │
+IPayment.Procesar(100000)           ← se invoca a través de la INTERFAZ
       ▼
-"Pago de $100000 realizado con PayPal"
+"Procesando pago de 100000 a través de PayPal."
 ```
 
-Lo importante: **`PaymentService` nunca menciona PayPal ni tarjeta**. Sólo depende de la
-interfaz. Quién es la implementación real lo decide el contenedor de dependencias.
+Lo importante: **`IndexModel` nunca escribe `new PayPalPayment()`**. Recibe un `IPayment` y
+llama a `Procesar`. Si mañana PayPal se reemplaza por otra clase, el cliente ni se entera.
 
-### 1. El contrato
-
-```csharp
-public interface IPaymentStrategy
-{
-    string Pagar(decimal monto);
-}
-```
-
-### 2. Las estrategias concretas
+### 1. El contrato (Product)
 
 ```csharp
-public class TarjetaPaymentStrategy : IPaymentStrategy
+namespace SistemaPago.Payments
 {
-    public string Pagar(decimal monto) => $"Pago de ${monto} realizado con tarjeta.";
-}
-
-public class PayPalPaymentStrategy : IPaymentStrategy
-{
-    public string Pagar(decimal monto) => $"Pago de ${monto} realizado con PayPal";
-}
-```
-
-### 3. El contexto
-
-```csharp
-public class PaymentService
-{
-    private readonly IPaymentStrategy _paymentStrategy;
-
-    public PaymentService(IPaymentStrategy paymentStrategy)   // inyección por constructor
+    public interface IPayment
     {
-        _paymentStrategy = paymentStrategy;
+        string Procesar(decimal monto);
     }
-
-    public string ProcesarPago(decimal monto) => _paymentStrategy.Pagar(monto);
 }
 ```
 
-### 4. La elección de la estrategia
-
-En `Startup.ConfigureServices` se registra cuál implementación resuelve `IPaymentStrategy`:
+### 2. Los productos concretos
 
 ```csharp
-//services.AddScoped<IPaymentStrategy, TarjetaPaymentStrategy>();
-services.AddScoped<IPaymentStrategy, PayPalPaymentStrategy>();
-services.AddScoped<PaymentService>();
+public class TarjetaPayment : IPayment
+{
+    public string Procesar(decimal monto) => $"Pago de ${monto} procesado con tarjeta.";
+}
+
+public class PayPalPayment : IPayment
+{
+    public string Procesar(decimal monto) => $"Procesando pago de {monto} a través de PayPal.";
+}
+
+public class TransferenciaPayment : IPayment
+{
+    public string Procesar(decimal monto) => $"Pago de ${monto} procesado mediante transferencia.";
+}
 ```
 
-**Para cambiar el medio de pago de toda la aplicación basta con mover el comentario de una
-línea a la otra.** Ninguna otra clase se toca. Eso es exactamente lo que el patrón busca.
+Las tres cumplen el mismo contrato, así que son intercambiables para quien las use.
+
+### 3. La fábrica
+
+```csharp
+public class PaymentFactory
+{
+    public IPayment Create(string tipoPago)
+    {
+        switch (tipoPago)
+        {
+            case "tarjeta":       return new TarjetaPayment();
+            case "paypal":        return new PayPalPayment();
+            case "transferencia": return new TransferenciaPayment();
+
+            default:
+                throw new ArgumentException($"Tipo de pago no válido: {tipoPago}");
+        }
+    }
+}
+```
+
+Sí, **el `switch` sigue existiendo** — pero ahora vive en *un solo* archivo, cuyo nombre dice
+exactamente para qué sirve. Esa es la ganancia del patrón: no eliminar la decisión, sino
+**centralizarla**. Nótese también el `default`, que convierte un tipo desconocido en un error
+explícito en vez de en un `null` que reventaría más adelante.
 
 ## Cómo agregar un medio de pago nuevo
 
-1. Crear `SistemaPago/Strategies/TransferenciaPaymentStrategy.cs`:
+1. Crear `SistemaPago/Payments/CriptoPayment.cs`:
 
    ```csharp
-   namespace SistemaPago.Strategies
+   namespace SistemaPago.Payments
    {
-       public class TransferenciaPaymentStrategy : IPaymentStrategy
+       public class CriptoPayment : IPayment
        {
-           public string Pagar(decimal monto)
-               => $"Pago de ${monto} realizado por transferencia bancaria.";
+           public string Procesar(decimal monto)
+               => $"Pago de ${monto} procesado en criptomonedas.";
        }
    }
    ```
 
-2. Registrarla en `Startup.ConfigureServices`:
+2. Agregar un `case` en `PaymentFactory.Create`:
 
    ```csharp
-   services.AddScoped<IPaymentStrategy, TransferenciaPaymentStrategy>();
+   case "cripto": return new CriptoPayment();
    ```
 
-No se modificó `PaymentService`, ni `IndexModel`, ni las estrategias existentes:
-**abierto a la extensión, cerrado a la modificación**.
+Un archivo nuevo y una línea. Ninguna página, ningún servicio y ninguna otra clase de pago
+se modifica.
 
 ## Ejecutar el proyecto
 
-Requiere el SDK de .NET Core 2.0 (o Visual Studio 2017+ con la carga de trabajo de ASP.NET).
+Requiere el SDK de .NET Core 2.0 (o Visual Studio con la carga de trabajo de ASP.NET).
 
 ```bash
 dotnet restore
 dotnet run --project SistemaPago/SistemaPago.csproj
 ```
 
-Luego abrir la URL que indique la consola (por defecto `http://localhost:5000`) y presionar
-el botón **Pagar $100.000**. El mensaje que aparece revela qué estrategia está activa.
+Luego abrir la URL que indique la consola (por defecto `http://localhost:5000`).
 
 ## Estructura del repositorio
 
 ```
 SistemaPago/
+├── Payments/                      ← el patrón Factory
+│   ├── IPayment.cs                    contrato común (Product)
+│   ├── TarjetaPayment.cs              producto concreto
+│   ├── PayPalPayment.cs               producto concreto
+│   ├── TransferenciaPayment.cs        producto concreto
+│   └── PaymentFactory.cs              la fábrica: decide y construye
 ├── Pages/
-│   ├── Index.cshtml           formulario con el botón de pago
-│   └── Index.cshtml.cs        cliente: pide PaymentService y muestra el mensaje
-├── Strategies/
-│   ├── IPaymentStrategy.cs        contrato común
-│   ├── TarjetaPaymentStrategy.cs  estrategia concreta
-│   ├── PayPalPaymentStrategy.cs   estrategia concreta
-│   └── PaymentService.cs          contexto
-├── Startup.cs                 registro de la estrategia activa (DI)
-└── Program.cs                 arranque del host web
+│   ├── Index.cshtml               formulario de pago
+│   └── Index.cshtml.cs            cliente: pide el IPayment a la fábrica
+├── Startup.cs                     configuración y registro de servicios
+└── Program.cs                     arranque del host web
 ```
+
+## Estado actual y siguientes pasos
+
+La carpeta `Payments/` ya está completa. Falta conectarla con la aplicación:
+
+- [ ] **`Startup.cs`** todavía registra los servicios del patrón Strategy
+  (`IPaymentStrategy`, `PaymentService`), que ya no existen en esta rama.
+  Reemplazar ese registro por el de la fábrica:
+
+  ```csharp
+  services.AddScoped<PaymentFactory>();
+  ```
+
+- [ ] **`Index.cshtml.cs`** todavía usa `SistemaPago.Strategies` y `PaymentService`.
+  Cambiarlo para que reciba `PaymentFactory` e invoque `Create(tipoPago).Procesar(monto)`.
+
+- [ ] **`Index.cshtml`** necesita un `<select name="tipoPago">` con las opciones
+  `tarjeta`, `paypal` y `transferencia`, para que la elección sea del usuario — que es
+  justamente lo que justifica tener una fábrica.
+
+> ⚠️ Mientras esos tres puntos estén pendientes **el proyecto no compila**, porque
+> `Startup.cs` e `Index.cshtml.cs` referencian clases del patrón Strategy que fueron
+> eliminadas de esta rama.
 
 ## Ideas para seguir practicando
 
-- **Elegir la estrategia en tiempo de ejecución**: que el usuario seleccione el medio de
-  pago en un `<select>` y una fábrica (`Func<string, IPaymentStrategy>` o un
-  `IEnumerable<IPaymentStrategy>` inyectado) devuelva la correspondiente.
-- **Datos reales**: que `Pagar` reciba un objeto `Pago` (monto, moneda, cliente) en vez de
-  un `decimal` suelto, y devuelva un resultado con estado y número de transacción.
-- **Pruebas unitarias**: `PaymentService` es trivial de testear porque se le puede pasar
-  una estrategia falsa (*mock*) — otra ventaja directa del patrón.
+- **Factory Method clásico**: convertir `PaymentFactory` en una clase abstracta con
+  subclases que decidan el producto, en vez de resolverlo con un `switch`.
+- **Abstract Factory**: que la fábrica devuelva además un validador y un generador de
+  comprobante coherentes con cada medio de pago.
+- **Sin `switch`**: registrar los `IPayment` en el contenedor de dependencias y resolverlos
+  por clave, o usar un `Dictionary<string, Func<IPayment>>`.
+- **Pruebas unitarias**: verificar que `Create("paypal")` devuelve un `PayPalPayment` y que
+  un tipo inválido lanza `ArgumentException`.
