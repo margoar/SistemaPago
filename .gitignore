@@ -1,0 +1,10 @@
+# Archivos generados por la compilación
+bin/
+obj/
+
+# Carpeta de Visual Studio
+.vs/
+
+# Archivos de usuario de Visual Studio
+*.user
+*.suo
